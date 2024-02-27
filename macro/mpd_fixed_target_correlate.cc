@@ -9,9 +9,9 @@ vector <vector<string>> Q1Q1{
   {"Tp_RESCALED", "F2_RESCALED"},
   {"Tp_RESCALED", "F3_RESCALED"},
 
-  {"Tpi_RESCALED", "F1_RESCALED"},
-  {"Tpi_RESCALED", "F2_RESCALED"},
-  {"Tpi_RESCALED", "F3_RESCALED"},
+  {"Tneg_RESCALED", "F1_RESCALED"},
+  {"Tneg_RESCALED", "F2_RESCALED"},
+  {"Tneg_RESCALED", "F3_RESCALED"},
 };
 
 vector <vector<string>> u1Q1{
