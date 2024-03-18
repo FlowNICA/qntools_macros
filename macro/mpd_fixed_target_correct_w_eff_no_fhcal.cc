@@ -7,7 +7,7 @@ using namespace ROOT::Math;
 using namespace ROOT::RDF;
 using fourVector=LorentzVector<PtEtaPhiE4D<double>>;
 
-void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std::string str_nucleus_mass="209"){
+void mpd_fixed_target_correct_w_eff_no_fhcal(std::string list, std::string cm_energy="2.5", std::string str_nucleus_mass="209", std::string eff_file=""){
 
   const double sNN = std::stod( cm_energy ); // in GeV
   const double M = 0.938; // in GeV/c^2
@@ -20,21 +20,37 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
 
   std::cout << "sqrtSnn = " << sNN << " GeV; T = " << T << "A GeV; Y_BEAM = " << Y_BEAM << std::endl;
   std::cout << "A = " << nucleus_mass << "; R = " << NUCLEUS_RADIUS << std::endl;
+
+  if (eff_file != "") std::cout << "Efficiency file: " << eff_file.c_str() << std::endl;
+  std::unique_ptr<TFile> fiEff{TFile::Open( eff_file.c_str(), "read")};
+
+  TH2D* h_eff_proton{nullptr}; 
+  TH2D* h_eff_pionP {nullptr}; 
+  TH2D* h_eff_pionM {nullptr}; 
+  TH2D* h_eff_pions {nullptr}; 
+  TH2D* h_eff_kaonP {nullptr}; 
+  TH2D* h_eff_kaonM {nullptr}; 
+  TH2D* h_eff_kaons {nullptr}; 
+  
+  fiEff->GetObject("h2_effYPt_proton", h_eff_proton);
+  fiEff->GetObject("h2_effYPt_pionP" , h_eff_pionP );
+  fiEff->GetObject("h2_effYPt_pionM" , h_eff_pionM );
+  fiEff->GetObject("h2_effYPt_pions" , h_eff_pions );
+  fiEff->GetObject("h2_effYPt_kaonP" , h_eff_kaonP );
+  fiEff->GetObject("h2_effYPt_kaonM" , h_eff_kaonM );
+  fiEff->GetObject("h2_effYPt_kaons" , h_eff_kaons );
+    
+  if (!h_eff_proton) std::cerr << "Warning: No efficiency histogram h2_effYPt_proton was found in file " << eff_file.c_str() << "\n";
+  if (!h_eff_pionP)  std::cerr << "Warning: No efficiency histogram h2_effYPt_pionP was found in file "  << eff_file.c_str() << "\n";
+  if (!h_eff_pionM)  std::cerr << "Warning: No efficiency histogram h2_effYPt_pionM was found in file "  << eff_file.c_str() << "\n";
+  if (!h_eff_pions)  std::cerr << "Warning: No efficiency histogram h2_effYPt_pions was found in file "  << eff_file.c_str() << "\n";
+  if (!h_eff_kaonP)  std::cerr << "Warning: No efficiency histogram h2_effYPt_kaonP was found in file "  << eff_file.c_str() << "\n";
+  if (!h_eff_kaonM)  std::cerr << "Warning: No efficiency histogram h2_effYPt_kaonM was found in file "  << eff_file.c_str() << "\n";
+  if (!h_eff_kaons)  std::cerr << "Warning: No efficiency histogram h2_effYPt_kaons was found in file "  << eff_file.c_str() << "\n";
   
   std::vector<int> f1_modules = { 15, 16, 17, 22, 24, 29, 30, 31 };
   std::vector<int> f2_modules = { 7, 8, 9, 10, 11, 14, 18, 21, 25, 28, 32, 35, 36, 37, 38, 39 };
   std::vector<int> f3_modules = { 1, 2, 3, 4, 5, 6, 12, 13, 19, 20, 26, 27, 33, 34, 40, 41, 42, 43, 44, 45 };
-
-  // Centrality for 2.5 GeV
-  std::vector<float> cent_bins;
-  std:;vector<int> cent_mult;
-  std::vector<float> cent_b;
-
-  if (sNN == 2.5){
-    cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 45., 55., 65., 75., 90.};
-    cent_mult = {186,162,142,123,107,92,79,68,49,35,24,16,1};
-    cent_b = {2.93,4.13,5.11,5.92,6.63,7.27,7.85,8.40,9.39,10.26,11.04,11.96,16.49};
-  }
   
   TStopwatch timer;
   timer.Start();
@@ -47,25 +63,6 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
   auto dd=d
     .Filter("mcB < 20.") // at least one filter is mandatory!!!
     .Define( "b_norm", [NUCLEUS_RADIUS](double b){ return (float)b / (float)NUCLEUS_RADIUS; },{"mcB"})
-    .Define( "refMult", [](vector<fourVector> _p){
-      int Mult = 0;
-      for (auto& mom:_p)
-        if(mom.Eta()>0 && mom.Eta()<2.)
-          Mult++;
-      return Mult;
-    },{"recoGlobalMom"})
-    .Define( "cent", [cent_mult,cent_bins](int refmult){
-      float cent = -1.;
-      if (cent_mult.size() == 0) return (float)-1.;
-      if (cent_bins.size() == 0) return (float)-1.;
-      if (refmult >= cent_mult.at(0))
-        cent = cent_bins.at(0);
-      for (int i=1; i<cent_mult.size(); ++i){
-        if (refmult >= cent_mult.at(i) && refmult < cent_mult.at(i-1))
-          cent = cent_bins.at(i);
-      }
-      return cent;
-    },{"refMult"})
     .Define( "psi_rp", "mcRP")
     .Define( "sim_y", [Y_BEAM]( const RVec<int> vec_pdg, vector<fourVector> vec_momentum ){
       std::vector<float> vec_y;
@@ -106,7 +103,19 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
     .Define( "tr_eta", "std::vector<float> vec_eta; for( auto mom : recoGlobalMom ){ vec_eta.push_back( mom.Eta() ); } return vec_eta;" )
     .Define( "tr_charge", "std::vector<short> vec_charge; for( auto q : recoGlobalCharge ){ vec_charge.push_back( q ); } return vec_charge;" )
     .Define( "tr_pdg", "recoGlobalSimPdg" )
-    //.Define( "tr_primary", "recoGlobalSimMotherId==-1" )
+    .Define( "tr_primary", "recoGlobalSimMotherId==-1" )
+    .Define ( "tr_isFHCal", []( const RVec<int> sim_id, const RVec<bool> has_hit){
+        std::vector<int> vec_hit;
+        vec_hit.reserve( sim_id.size() );
+        for( int i=0; i<sim_id.size(); ++i ){
+          auto id = sim_id.at(i);
+          if ( id < has_hit.size() )
+            vec_hit.push_back(has_hit.at(id));
+          else
+            vec_hit.push_back( -999 );
+        }
+        return vec_hit;
+      }, {"recoGlobalSimIndex", "simHasHitFHCal"} )
     .Define( "tr_y", [Y_BEAM]( const RVec<int> vec_pdg, vector<fourVector> vec_momentum ){
       std::vector<float> vec_y;
       vec_y.reserve( vec_pdg.size() );
@@ -139,8 +148,6 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
     .Define( "tr_is_kaons", "abs(recoGlobalSimPdg)==321" )
     .Define( "tr_nhits", "std::vector<int> vec_nhits; for( auto n : recoGlobalNhits ){ vec_nhits.push_back( n ); } return vec_nhits;" )
     .Define( "tr_dca", "vector <float> vec_dca; for ( auto dca : recoGlobalDca ){ vec_dca.push_back( sqrt( dca.Mag2() ) ); } return vec_dca;" )
-    .Define( "tr_primary", "vector <bool> vec_prim; for ( auto dca : tr_dca ){ bool prim = ( dca < 1. ) ? true : false; vec_prim.push_back( prim ); } return vec_prim;")
-    .Define( "tr_tof", "recoGlobalTofFlag")
     .Define( "fhcal_module_id", "fhcalModId" )
     .Define( "fhcal_module_pos", "fhcalModPos" )
     .Define( "fhcal_module_x", "std::vector<float> vec_x{}; for( auto pos : fhcal_module_pos ){ vec_x.push_back( pos.X() ); }; return vec_x;" )
@@ -148,19 +155,123 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
     .Define( "fhcal_module_z", "std::vector<float> vec_z{}; for( auto pos : fhcal_module_pos ){ vec_z.push_back( pos.Z() ); }; return vec_z;" )
     .Define( "fhcal_module_phi", "std::vector<float> vec_phi{}; for( auto pos : fhcal_module_pos ){ vec_phi.push_back( pos.Phi() ); }; return vec_phi;" )
     .Define( "fhcal_module_energy", "std::vector<float> vec_en; for( auto en : fhcalModE){ vec_en.push_back( en ); } return vec_en;" )
+    .Define( "tr_WeightProton", [h_eff_proton](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = _pdg.at(i);
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_proton) ? (float)h_eff_proton->GetBinContent(h_eff_proton->GetXaxis()->FindBin(y), h_eff_proton->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_proton", "tr_primary"})
+    .Define( "tr_WeightPionP", [h_eff_pionP](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff =(h_eff_pionP) ? (float)h_eff_pionP->GetBinContent(h_eff_pionP->GetXaxis()->FindBin(y), h_eff_pionP->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_pionP", "tr_primary"})
+    .Define( "tr_WeightPionM", [h_eff_pionM](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_pionM) ? (float)h_eff_pionM->GetBinContent(h_eff_pionM->GetXaxis()->FindBin(y), h_eff_pionM->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_pionM", "tr_primary"})
+    .Define( "tr_WeightPions", [h_eff_pions](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_pions) ? (float)h_eff_pions->GetBinContent(h_eff_pions->GetXaxis()->FindBin(y), h_eff_pions->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_pions", "tr_primary"})
+    .Define( "tr_WeightKaonP", [h_eff_kaonP](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_kaonP) ? (float)h_eff_kaonP->GetBinContent(h_eff_kaonP->GetXaxis()->FindBin(y), h_eff_kaonP->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_kaonP", "tr_primary"})
+    .Define( "tr_WeightKaonM", [h_eff_kaonM](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_kaonM) ? (float)h_eff_kaonM->GetBinContent(h_eff_kaonM->GetXaxis()->FindBin(y), h_eff_kaonM->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_kaonM", "tr_primary"})
+    .Define( "tr_WeightKaons", [h_eff_kaons](std::vector<float> _pt, std::vector<float> _y, RVec<int> _pdg, RVec<int> _primary){
+      std::vector<float> vec_w;
+      for (int i=0; i<_pdg.size(); ++i){
+        auto pt = _pt.at(i);
+        auto y = _y.at(i);
+        auto pdg = std::round(_pdg.at(i));
+        auto prim = std::round(_primary.at(i));
+        auto eff = (h_eff_kaons) ? (float)h_eff_kaons->GetBinContent(h_eff_kaons->GetXaxis()->FindBin(y), h_eff_kaons->GetYaxis()->FindBin(pt)) : (float)1;
+        if (eff > 1e-3 && pdg && prim)
+          vec_w.push_back(1./eff);
+        else
+          vec_w.push_back(0.);
+      }
+      return vec_w;
+    },{"tr_pT", "tr_y", "tr_is_kaons", "tr_primary"})
     ;
   
   auto correction_task = CorrectionTask( dd, "correction_out.root", "qa.root" );
-  correction_task.SetEventVariables(std::regex("b_norm|psi_rp|cent"));
+  correction_task.SetEventVariables(std::regex("b_norm|psi_rp"));
   correction_task.SetChannelVariables({std::regex("fhcal_module_(id|phi|energy|x|y|z)")});
   correction_task.SetTrackVariables({
-      std::regex("tr_(pT|y|phi|charge|pdg|primary|is_proton|is_pionP|is_pionM|is_pions|nhits|dca)"),
+      std::regex("tr_(pT|y|phi|charge|pdg|primary|is_proton|is_pionP|is_pionM|is_pions|nhits|dca|WeightProton|WeightPionP|WeightPionM|WeightPions|WeightKaonP|WeightKaonM|WeightKaons|isFHCal)"),
       std::regex("sim_(pT|y|phi|pdg|is_proton|is_pionP|is_pionM|is_pions|mother_id)")
     });
 
   correction_task.InitVariables();
-  //correction_task.AddEventAxis( { "b_norm", 10, 0, 2.0 } );
-  correction_task.AddEventAxis( { "cent", {0., 5., 10., 15., 20., 25., 30., 35., 40., 50., 60., 70., 80.} } );
+  correction_task.AddEventAxis( { "b_norm", 10, 0, 2.0 } );
 
   VectorConfig f1( "F1", "fhcal_module_phi", "fhcal_module_energy", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
   f1.SetHarmonicArray( {1, 2} );
@@ -201,69 +312,73 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
           { "tr_pT", 15, 0.0, 1.5 },
   };
 
-  VectorConfig proton( "proton", "tr_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  VectorConfig proton( "proton", "tr_phi", "tr_WeightProton", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   proton.SetHarmonicArray( {1, 2} );
   proton.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   proton.SetCorrectionAxes( proton_axes );
   proton.AddCut( "tr_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == 2212;
-    }, "proton cut" );
+  }, "proton cut" );
   proton.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   proton.AddCut( "tr_charge", [](double charge){ return charge > 0; }, "q > 0" );
   proton.AddCut( "tr_nhits", [](double nhits){ return nhits > 27; }, "Nhits > 27" );
   proton.AddCut( "tr_dca", [](double dca){ return dca < 1.; }, "dca < 1 cm" );
-  proton.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_is_proton");
+  proton.AddCut( "tr_isFHCal", [](double _hit) { auto hit = std::round(_hit); return hit == 0; }, "no tracks in FHCal");
+  proton.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightProton");
   correction_task.AddVector(proton);
-
-  VectorConfig pi_pos( "pi_pos", "tr_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  
+  VectorConfig pi_pos( "pi_pos", "tr_phi", "tr_WeightPionP", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   pi_pos.SetHarmonicArray( {1, 2} );
   pi_pos.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   pi_pos.SetCorrectionAxes( pion_axes );
   pi_pos.AddCut( "tr_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == 211;
-    }, "pi_pos cut" );
+  }, "pi_pos cut" );
   pi_pos.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   pi_pos.AddCut( "tr_charge", [](double charge){ return charge > 0; }, "q > 0" );
   pi_pos.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
   pi_pos.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
-  pi_pos.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_is_pionP");
+  pi_pos.AddCut( "tr_isFHCal", [](double _hit) { auto hit = std::round(_hit); return hit == 0; }, "no tracks in FHCal");
+  pi_pos.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionP");
   correction_task.AddVector(pi_pos);
-
-  VectorConfig pi_neg( "pi_neg", "tr_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  
+  VectorConfig pi_neg( "pi_neg", "tr_phi", "tr_WeightPionM", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   pi_neg.SetHarmonicArray( {1, 2} );
   pi_neg.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   pi_neg.SetCorrectionAxes( pion_axes );
   pi_neg.AddCut( "tr_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == -211;
-    }, "pi_neg cut" );
+  }, "pi_neg cut" );
   pi_neg.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   pi_neg.AddCut( "tr_charge", [](double charge){ return charge < 0; }, "q < 0" );
   pi_neg.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
   pi_neg.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
-  pi_neg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_is_pionM");
+  pi_neg.AddCut( "tr_isFHCal", [](double _hit) { auto hit = std::round(_hit); return hit == 0; }, "no tracks in FHCal");
+  pi_neg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionM");
   correction_task.AddVector(pi_neg);
-
-  VectorConfig Tp( "Tp", "tr_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  
+  VectorConfig Tp( "Tp", "tr_phi", "tr_WeightProton", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   Tp.SetHarmonicArray( {1, 2} );
   Tp.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   Tp.AddCut( "tr_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == 2212;
-    }, "proton cut" );
+  }, "proton cut" );
   Tp.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   Tp.AddCut( "tr_charge", [](double charge){ return charge > 0; }, "proton cut" );
   Tp.AddCut( "tr_y", [](double ycm){
     return -1. < ycm && ycm < -0.6;
-    }, "Tp ycm cut" );
+  }, "Tp ycm cut" );
   Tp.AddCut( "tr_nhits", [](double nhits){ return nhits > 27; }, "Nhits > 27" );
   Tp.AddCut( "tr_dca", [](double dca){ return dca < 1.; }, "dca < 1 cm" );
+  Tp.AddCut( "tr_isFHCal", [](double _hit) { auto hit = std::round(_hit); return hit == 0; }, "no tracks in FHCal");
   Tp.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_is_proton");
   correction_task.AddVector(Tp);
-
-  VectorConfig Tneg( "Tneg", "tr_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  
+  VectorConfig Tneg( "Tneg", "tr_phi", "tr_WeightPions", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   Tneg.SetHarmonicArray( {1, 2} );
   Tneg.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   Tneg.AddCut( "tr_pdg", [](double pid){
@@ -273,10 +388,11 @@ void mpd_fixed_target_correct(std::string list, std::string cm_energy="2.5", std
   Tneg.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   Tneg.AddCut( "tr_y", [](double eta){
     return -1.3 < eta && eta < -0.2;
-    }, "Tneg y cut" );
+  }, "Tneg y cut" );
   Tneg.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
   Tneg.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
-  Tneg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_is_pions");
+  Tneg.AddCut( "tr_isFHCal", [](double _hit) { auto hit = std::round(_hit); return hit == 0; }, "no tracks in FHCal");
+  Tneg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPions");
   correction_task.AddVector(Tneg);
 
   std::vector<Qn::AxisD> sim_proton_axes{

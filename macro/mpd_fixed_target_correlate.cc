@@ -57,7 +57,8 @@ vector <vector<string>> u2Q2{
 void mpd_fixed_target_correlate(string inputFiles="qn.root", string outputFile="corr.root")
 {
   int nSamples = 100;
-  Qn::AxisD centAxis({"b_norm", 20, 0, 2});
+  //Qn::AxisD centAxis({"b_norm", 20, 0, 2});
+  Qn::AxisD centAxis({"cent", {0., 5., 10., 15., 20., 25., 30., 35., 40., 50., 60., 70., 80.}});
   auto axes_correlation = Qn::MakeAxes(centAxis);
   ROOT::RDataFrame d( "tree", inputFiles.c_str() );
   auto d_samples = Qn::Correlation::Resample(d, nSamples);
@@ -81,7 +82,7 @@ void mpd_fixed_target_correlate(string inputFiles="qn.root", string outputFile="
     corrBuilder.AddCorrelationWithInternalReader(corrName+".x1y1", P2::xy(1, 1), wUnity, wn, qn, qn);
     corrBuilder.AddCorrelationWithInternalReader(corrName+".y1x1", P2::yx(1, 1), wUnity, wn, qn, qn);
   }
-
+  
   for (auto &corr:u1Q1){
     std::array<std::string, 2> qn{corr.at(0), corr.at(1)};
     string corrName=corr.at(0)+"."+corr.at(1);
