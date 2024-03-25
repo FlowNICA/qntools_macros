@@ -449,10 +449,10 @@ void run8_proton_correct( std::string list,
           .Alias("trStsChi2", "stsTrackChi2Ndf")
           .Define("trEta","ROOT::VecOps::RVec<float> eta; for(auto& mom : trMom) eta.push_back(mom.eta()); return eta;")
           .Define("trPhi","ROOT::VecOps::RVec<float> phi;for(auto& mom : trMom) phi.push_back(mom.phi()); return phi;")
-          .Filter([]( ROOT::VecOps::RVec<float> bc1_int, ROOT::VecOps::RVec<float> fd_int ){
-            float trigger = fd_int[0]-bc1_int[0]*0.602;
-            return -25900 < trigger && trigger < -6030;
-          }, {"bc1sIntegral", "fdIntegral"} )
+          // .Filter([]( ROOT::VecOps::RVec<float> bc1_int, ROOT::VecOps::RVec<float> fd_int ){
+          //   float trigger = fd_int[0]-bc1_int[0]*0.602;
+          //   return -25900 < trigger && trigger < -6030;
+          // }, {"bc1sIntegral", "fdIntegral"} )
           .Filter([&physical_runs]( UInt_t run_id ){ 
             return std::find( physical_runs.begin(), physical_runs.end(), run_id) != physical_runs.end();
           }, {"runId"} )
@@ -554,6 +554,7 @@ void run8_proton_correct( std::string list,
         { "trPt", 10, 0.0, 2.0 },
   };
   
+ 
   VectorConfig proton( "proton", "trPhi", "trWeight", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   proton.SetHarmonicArray( {1, 2} );
   proton.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
@@ -562,10 +563,10 @@ void run8_proton_correct( std::string list,
     return prob > 0.95;
   }, "proton cut" );
   proton.AddCut( "trFhcalX", [](double pos){
-    return pos < -40.0 || pos > 170;
+    return pos < -30.0 || pos > 160;
   }, "cut on x-pos in fhcal plane" );
   proton.AddCut( "trFhcalY", [](double pos){
-    return pos < -70.0 || pos > 70;
+    return pos < -60.0 || pos > 60;
   }, "cut on y-pos in fhcal plane" );
   proton.AddCut( "trStsNhits", [](double nhits){
     return nhits > 5.5;
