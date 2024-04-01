@@ -102,6 +102,22 @@ vector <vector<string>> u1_rescaled_Q1_rescaled=
   {"proton_RESCALED", "F1_RESCALED"},
   {"proton_RESCALED", "F2_RESCALED"},
   {"proton_RESCALED", "F3_RESCALED"},
+
+  {"proton_0_90_RESCALED", "F1_RESCALED"},
+  {"proton_0_90_RESCALED", "F2_RESCALED"},
+  {"proton_0_90_RESCALED", "F3_RESCALED"},
+
+  {"proton_90_180_RESCALED", "F1_RESCALED"},
+  {"proton_90_180_RESCALED", "F2_RESCALED"},
+  {"proton_90_180_RESCALED", "F3_RESCALED"},
+
+  {"proton_180_270_RESCALED", "F1_RESCALED"},
+  {"proton_180_270_RESCALED", "F2_RESCALED"},
+  {"proton_180_270_RESCALED", "F3_RESCALED"},
+
+  {"proton_270_0_RESCALED", "F1_RESCALED"},
+  {"proton_270_0_RESCALED", "F2_RESCALED"},
+  {"proton_270_0_RESCALED", "F3_RESCALED"},
 };
 
 vector <vector<string>> Q1_rescaled_Q1_rescaled =
@@ -130,6 +146,11 @@ vector <vector<string>> u2Q1Q1_rescaled=
   {"proton_RESCALED", "F1_RESCALED", "F2_RESCALED"},
   {"proton_RESCALED", "F2_RESCALED", "F3_RESCALED"},
   {"proton_RESCALED", "F1_RESCALED", "F3_RESCALED"},
+};
+
+vector <vector<string>> u2Q1Q1Q1_rescaled=
+{
+  {"proton_RESCALED", "F1_RESCALED", "F2_RESCALED", "F3_RESCALED"},
 };
 
 
