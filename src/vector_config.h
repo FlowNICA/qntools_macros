@@ -25,6 +25,12 @@ enum class CORRECTION{
   TWIST_RESCALING
 };
 
+enum class TWIST_RESCALING_METHOD{
+  DOUBLE_HARMONIC,
+  CORRELATION,
+};
+
+
 struct vector_cut;
 struct histo1d;
 struct histo2d;
@@ -84,7 +90,11 @@ public:
     corrections_ = corrections;
     return *this;
   }
+  VectorConfig& SetTwistRescalingMethod(TWIST_RESCALING_METHOD method){ twis_rescaling_method_ = method; return *this; }
+  VectorConfig& SetTwistRescalingReference(std::array<std::string, 2> reference){ twist_rescaling_reference_ = reference; return *this; }
   VectorConfig& SetRecenteringWidthEqualization( bool value ){ recentering_width_equalization_ = value; return *this; }
+  VectorConfig& SetApplyTwist( bool value ){ apply_twist_ = value; return *this; }
+  VectorConfig& SetRescaling( bool value ){ apply_rescaling_ = value; return *this; }
   void AddCut( const std::string& field, const std::function<bool(double)>& function, const std::string& description );
   void AddHisto1D( const Qn::AxisD& axis, const std::string& weight= "Ones" );
   void AddHisto2D( const std::vector<Qn::AxisD>& axis, const std::string& weight= "Ones" );
@@ -96,9 +106,13 @@ private:
   std::string weight_field_;
   VECTOR_TYPE type_;
   NORMALIZATION normalization_;
+  TWIST_RESCALING_METHOD twis_rescaling_method_{TWIST_RESCALING_METHOD::DOUBLE_HARMONIC};
+  std::array<std::string, 2> twist_rescaling_reference_{};
   std::vector<int> harmonic_array_{1};
   std::vector<CORRECTION> corrections_;
   bool recentering_width_equalization_{false};
+  bool apply_twist_{true};
+  bool apply_rescaling_{true};
   std::vector<Qn::AxisD> correction_axes_{};
   std::vector<vector_cut> cuts_{};
   std::vector<histo1d> vec_histo1d_{};
