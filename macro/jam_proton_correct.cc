@@ -207,7 +207,35 @@ void jam_proton_correct(  std::string list,
     50, 51, 
     52, 53,
   };
+
+  std::vector<int> s1_modules = {
+    0,  1,   2,  3,  4,  5,  6,  7,  8,  9, 
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 
+    30, 31, 31, 33, 34, 35, 36, 37, 38, 39,
+  };
   
+  std::vector<int> s2_modules = {
+    62,   63,  64,  65,  66,  67,  68,  69,  70,  71,
+    80,   81,  82,  83,  84,  85,  86,  87,  88,  89,
+    98,   99, 100,                          101, 102,
+    111, 112, 113,                          114, 115,
+    124, 125, 126, 127, 128, 129, 130, 131, 132, 133,
+    142, 143, 144, 145, 146, 147, 148, 149, 150, 151,
+  };
+
+   std::vector<int> s3_modules = {
+     40,  41,  42,  43,  44,  45,  46,  47, 48,  49,   50,  51, 52,  53,       54,  55,  56,  57,
+     58,  59,  60,  61,                                                         72,  73,  74,  75,
+     76,  77,  78,  79,                                                         90,  91,  92,  93,
+     94,  95,  96,  97,                                                        103, 104, 105, 106,
+    107, 108, 109, 110,                                                        116, 117, 118, 119,
+    120, 121, 122, 123,                                                        134, 135, 136, 137,
+    138, 139, 140, 141,                                                        152, 151, 152, 153,
+    156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174,
+
+  };
+
   TStopwatch timer;
   timer.Start();
   std::string treename = "t";
@@ -228,6 +256,7 @@ void jam_proton_correct(  std::string list,
           .Define( "simIsNeutron", simIsNeutron, {"simPdg", "simMotherId"} )
           .Define( "simProtonY", simProtonYcm, {"simPz", "simPq"} )
           .Define("fhcalModPhi","ROOT::VecOps::RVec<float> phi; for(auto& pos:fhcalModPos) phi.push_back(pos.phi()); return phi;")
+          .Define("scwallModPhi","ROOT::VecOps::RVec<float> phi; for(auto& pos:scwallModPos) phi.push_back(pos.phi()); return phi;")
           .Define("fhcalModX","ROOT::VecOps::RVec<float> x; for(auto& pos:fhcalModPos) x.push_back(pos.x()); return x;")
           .Define("fhcalModY","ROOT::VecOps::RVec<float> y; for(auto& pos:fhcalModPos) y.push_back(pos.y()); return y;")
           .Define("trPt","ROOT::VecOps::RVec<float> pt; for(auto& mom:trMom) pt.push_back(mom.pt()); return pt;")
@@ -268,8 +297,12 @@ void jam_proton_correct(  std::string list,
 
   auto correction_task = CorrectionTask( dd, "correction_out.root", calib_in_file );
   correction_task.SetEventVariables(std::regex("centrality|psiRP"));
-  correction_task.SetChannelVariables({std::regex("fhcalMod(X|Y|Phi|E|Id)")});
+  correction_task.SetChannelVariables({
+    // std::regex("fhcalMod(X|Y|Phi|E|Id)"),
+    std::regex("scwallMod(Phi|Q|Id)"),
+  });
   correction_task.SetTrackVariables({
+                                      std::regex("tr(Pt|Px|Py|Eta|Phi|IsProton|IsProtonTof|Charge|ProtonY|DcaR|Chi2Ndf|Nhits|Weight|FhcalX|FhcalY|StsNhits|StsChi2)"),
                                       std::regex("sim(Pt|Eta|Phi|IsProton|IsNeutron|ProtonY|Ekin)"),
                                     });
 
@@ -282,14 +315,71 @@ void jam_proton_correct(  std::string list,
   // psi_rp.AddHisto1D({"psiRp", 100, -3.5, 3.5}, "psiRP");
   correction_task.AddVector(psi_rp);
 
-  std::vector<Qn::AxisD> tru_proton_axes{
+  // VectorConfig f1( "F1", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  // f1.SetHarmonicArray( {1, 2} );
+  // f1.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  // f1.AddCut( "fhcalModId", [&f1_modules](double mod_id){
+  //   auto id = static_cast<int>(mod_id);
+  //   return std::find( f1_modules.begin(), f1_modules.end(), id) != f1_modules.end();
+  //   }, "F1 Cut" );
+  // f1.AddHisto2D({{"fhcalModX", 100, -100, 100}, {"fhcalModY", 100, -100, 100}});
+  // correction_task.AddVector(f1);
+
+  // VectorConfig f2( "F2", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  // f2.SetHarmonicArray( {1, 2} );
+  // f2.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  // f2.AddCut( "fhcalModId", [&f2_modules](double mod_id){
+  //   auto id = static_cast<int>(mod_id);
+  //   return std::find( f2_modules.begin(), f2_modules.end(), id) != f2_modules.end();
+  //   }, "F2 Cut" );
+  // f2.AddHisto2D({{"fhcalModX", 100, -100, 100}, {"fhcalModY", 100, -100, 100}});
+  // correction_task.AddVector(f2);
+
+  // VectorConfig f3( "F3", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  // f3.SetHarmonicArray( {1, 2} );
+  // f3.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  // f3.AddCut( "fhcalModId", [&f3_modules](double mod_id){
+  //   auto id = static_cast<int>(mod_id);
+  //   return std::find( f3_modules.begin(), f3_modules.end(), id) != f3_modules.end();
+  //   }, "F3 Cut" );
+  // f3.AddHisto2D({{"fhcalModX", 100, -100, 100}, {"fhcalModY", 100, -100, 100}});
+  // correction_task.AddVector(f3);
+  
+  VectorConfig s1( "S1", "scwallModPhi", "scwallModQ", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  s1.SetHarmonicArray( {1, 2} );
+  s1.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  s1.AddCut( "scwallModId", [&s1_modules](double mod_id){
+    auto id = static_cast<int>(mod_id);
+    return std::find( s1_modules.begin(), s1_modules.end(), id) != s1_modules.end();
+    }, "s1 Cut" );
+  correction_task.AddVector(s1);
+
+  VectorConfig s2( "S2", "scwallModPhi", "scwallModQ", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  s2.SetHarmonicArray( {1, 2} );
+  s2.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  s2.AddCut( "scwallModId", [&s2_modules](double mod_id){
+    auto id = static_cast<int>(mod_id);
+    return std::find( s2_modules.begin(), s2_modules.end(), id) != s2_modules.end();
+    }, "s2 Cut" );
+  correction_task.AddVector(s2);
+
+  VectorConfig s3( "S3", "scwallModPhi", "scwallModQ", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
+  s3.SetHarmonicArray( {1, 2} );
+  s3.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  s3.AddCut( "scwallModId", [&s3_modules](double mod_id){
+    auto id = static_cast<int>(mod_id);
+    return std::find( s3_modules.begin(), s3_modules.end(), id) != s3_modules.end();
+    }, "s3 Cut" );
+  correction_task.AddVector(s3);
+
+   std::vector<Qn::AxisD> tru_proton_axes{
         { "simProtonY", 10, -0.6, 1.4 },
         { "simPt", 10, 0.0, 2.0 },
   };
 
   VectorConfig tru_proton( "tru_proton", "simPhi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
   tru_proton.SetHarmonicArray( {1, 2, 3} );
-  tru_proton.SetCorrections( {CORRECTION::PLAIN } );
+  tru_proton.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING,  } );
   tru_proton.SetCorrectionAxes( tru_proton_axes );
   tru_proton.AddCut( "simIsProton", [](double pid){
     auto pdg_code = static_cast<int>(pid);
@@ -301,44 +391,35 @@ void jam_proton_correct(  std::string list,
   tru_proton.AddHisto2D({{"simProtonY", 100, -0.5, 1.5}, {"simPt", 100, 0.0, 2.0}}, "simIsProton");
   correction_task.AddVector(tru_proton);
 
-  VectorConfig S1( "S1", "simPhi", "simEkin", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  S1.SetHarmonicArray( {1, 2, 3} );
-  S1.SetCorrections( {CORRECTION::PLAIN } );
-  S1.AddCut( "simEta", [](double eta){
-    return 3.8 < eta && eta < 5.4;
-    }, "rapidity cut" );
-  S1.AddCut( "simIsNeutron", [](double pid){
-    auto pdg_code = static_cast<int>(pid);
-    return pdg_code == 1;
-    }, "proton cut" );
-  S1.AddHisto2D({{"simProtonY", 100, -0.5, 1.5}, {"simPt", 100, 0.0, 2.0}}, "simIsProton");
-  correction_task.AddVector(S1);
-
-  VectorConfig S2( "S2", "simPhi", "simEkin", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  S2.SetHarmonicArray( {1, 2, 3} );
-  S2.SetCorrections( {CORRECTION::PLAIN } );
-  S2.AddCut( "simEta", [](double eta){
-    return 3.3 < eta && eta < 3.8;
-    }, "rapidity cut" );
-  S2.AddCut( "simIsNeutron", [](double pid){
-    auto pdg_code = static_cast<int>(pid);
-    return pdg_code == 1;
-    }, "proton cut" );
-  S2.AddHisto2D({{"simProtonY", 100, -0.5, 1.5}, {"simPt", 100, 0.0, 2.0}}, "simIsProton");
-  correction_task.AddVector(S2);
-
-  VectorConfig S3( "S3", "simPhi", "simEkin", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  S3.SetHarmonicArray( {1, 2, 3} );
-  S3.SetCorrections( {CORRECTION::PLAIN } );
-  S3.AddCut( "simEta", [](double eta){
-    return 2.7 < eta && eta < 3.3;
-    }, "rapidity cut" );
-  S3.AddCut( "simIsNeutron", [](double pid){
-    auto pdg_code = static_cast<int>(pid);
-    return pdg_code == 1;
-    }, "proton cut" );
-  S3.AddHisto2D({{"simProtonY", 100, -0.5, 1.5}, {"simPt", 100, 0.0, 2.0}}, "simIsProton");
-  correction_task.AddVector(S3);
+  std::vector<Qn::AxisD> proton_axes{
+        { "trProtonY", 12, -0.2, 1.0 },
+        { "trPt", 10, 0.0, 2.0 },
+  };
+  
+  VectorConfig proton( "proton", "trPhi", "trWeight", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  proton.SetHarmonicArray( {1, 2, 3} );
+  proton.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  proton.SetCorrectionAxes( proton_axes );
+  proton.AddCut( "trIsProtonTof", [](double prob){
+    return static_cast<int>(prob) == 1;
+  }, "proton cut" );
+  proton.AddCut( "trFhcalX", [](double pos){
+    return pos < -30.0 || pos > 160;
+  }, "cut on x-pos in fhcal plane" );
+  proton.AddCut( "trFhcalY", [](double pos){
+    return pos < -60.0 || pos > 60;
+  }, "cut on y-pos in fhcal plane" );
+  proton.AddCut( "trStsNhits", [](double nhits){
+    return nhits > 5.5;
+  }, "cut on fake tracks" );
+  proton.AddCut( "trDcaR", [](double dca){
+    return dca < 5.0;
+  }, "DCA cut" );
+  proton.AddCut( "trStsChi2", [](double chi2){
+    return chi2 < 5.0;
+  }, "cut on chi2 in sts" );
+  proton.AddHisto2D({{"trProtonY", 100, -0.5, 1.5}, {"trPt", 100, 0.0, 2.0}}, "trIsProton");
+  correction_task.AddVector(proton);
 
   correction_task.Run();
   auto n_events_filtered = *(dd.Count());
