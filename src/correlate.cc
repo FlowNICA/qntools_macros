@@ -2,7 +2,7 @@
 // Created by Misha on 3/7/2023.
 //
 
-#define QNTOOLS_INCLUDE_PATH "/lustre/home/user/p/parfenov/Soft/QnTools/install-mpd/lib/cmake/QnTools/../../../include/QnTools"
+#define QNTOOLS_INCLUDE_PATH "/lustre/home/user/p/parfenov/Soft/QnTools/install-bmn/lib/cmake/QnTools/../../../include/QnTools"
 
 #include <TROOT.h>
 #include <stdexcept>

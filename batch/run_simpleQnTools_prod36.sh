@@ -34,7 +34,7 @@ export ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:/lustre/home/user/p/parfenov/Soft/Qn
 export exe_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correct
 export exe_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correlate
 
-export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correct_w_eff.cc
+export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correct_prod36.cc
 export macro_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correlate.cc
 
 echo "${exe_correct} ${macro_correct} $list_dir/$file_list $ecm $nucl_mass $efficiency_file $pid_file"

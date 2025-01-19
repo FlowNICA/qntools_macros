@@ -4,15 +4,13 @@
 #SBATCH -p mephi
 #SBATCH --mem-per-cpu=10G
 #SBATCH -t 8:00:00
-#SBATCH -J QnToolsEfficiencyMpd
+#SBATCH -J QnToolsMcPico
 #SBATCH -o /lustre/stor2/mephi/parfenov/TMP/slurm_runQnTools_%A_%a.out
 
 list_dir=${1}
 output_dir=${2}
 ecm=${3}
-#nucl_mass=${4}
-efficiency_file=${4}
-pid_file=${5}
+isCms=${4}
 
 id=$SLURM_ARRAY_TASK_ID
 
@@ -34,17 +32,13 @@ export ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:/lustre/home/user/p/parfenov/Soft/Qn
 export exe_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correct
 export exe_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correlate
 
-export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correct_w_eff.cc
-export macro_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correlate.cc
+export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mcpico_correct.cc
+export macro_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mcpico_correlate.cc
 
-echo "${exe_correct} ${macro_correct} $list_dir/$file_list $ecm $nucl_mass $efficiency_file $pid_file"
+echo "${exe_correct} ${macro_correct} $list_dir/$file_list $ecm $isCms"
 
 # PLAIN
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
-# RECENTERING
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
-# TWIST AND RESCALING
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
+time $exe_correct $macro_correct $list_dir/$file_list $ecm $isCms
 
 echo "${exe_correlate} ${macro_correlate} correction_out.root"
 time ${exe_correlate} ${macro_correlate} correction_out.root

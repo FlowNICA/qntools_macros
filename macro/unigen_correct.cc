@@ -7,9 +7,8 @@ using namespace ROOT::Math;
 using namespace ROOT::RDF;
 using fourVector=LorentzVector<PxPyPzE4D<double>>;
 
-void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string Cms="true")
+void unigen_correct(std::string list, std::string cm_energy="2.5", bool isCms=true)
 {
-  const bool isCms = (bool)std::stoi(Cms);
   const double sNN = std::stod( cm_energy ); // in GeV
   const double M = 0.938; // in GeV/c^2
   const double T = sNN*sNN/(2.*M) - 2.*M;
@@ -24,22 +23,24 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
   std::vector<float> cent_b;
 
   // Xe+W @ 2.87 GeV
-  cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
-  cent_b = { 1.43172, 2.87406, 4.05374, 5.0333, 5.86304, 6.58249, 7.22197, 7.80409, 8.34523, 8.8571, 9.34824, 9.8255, 10.2956, 10.7666, 11.2494, 11.7595, 12.3179, 12.9533, 13.7034};
-  // Xe+Xe @ 2.87 GeV
   // cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
-  // cent_b = { 1.39543, 2.70341, 3.76519, 4.64771, 5.40276, 6.06901, 6.67396, 7.23605, 7.76659, 8.27183, 8.75493, 9.21803, 9.66421, 10.0995, 10.5351, 10.9889, 11.488, 12.0706, 12.7879};
+  // cent_b = { 1.43172, 2.87406, 4.05374, 5.0333, 5.86304, 6.58249, 7.22197, 7.80409, 8.34523, 8.8571, 9.34824, 9.8255, 10.2956, 10.7666, 11.2494, 11.7595, 12.3179, 12.9533, 13.7034};
+  // Xe+Xe @ 2.87 GeV
+  cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
+  cent_b = { 1.39543, 2.70341, 3.76519, 4.64771, 5.40276, 6.06901, 6.67396, 7.23605, 7.76659, 8.27183, 8.75493, 9.21803, 9.66421, 10.0995, 10.5351, 10.9889, 11.488, 12.0706, 12.7879};
 
   TStopwatch timer;
   timer.Start();
-  std::string treename = "mctree";
+  
+  std::string treename = "events";
   TFileCollection collection( "collection", "", list.c_str() );
   auto* chain = new TChain( treename.c_str() );
   chain->AddFileInfoList( collection.GetList() );
   ROOT::RDataFrame d( *chain );
   auto dd=d
-    .Alias( "b", "bimp" )
-    .Filter( "b<20.")
+    .Alias( "b", "fB" )
+    .Filter("b<20.")
+    .Define("psi_rp", [](double _psi){ return (float)_psi; }, {"fPhi"})
     .Define("cent", [cent_bins,cent_b](float b){
       float cent = -1.;
       if (cent_b.size() == 0) return (float)-1.;
@@ -52,46 +53,30 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
       }
       return cent;
     }, {"b"})
-    .Define( "psi_rp", [](){
-      std::random_device rnd_device;
-      std::mt19937 generator(rnd_device());
-      std::uniform_real_distribution<float> distribution(-1.*Pi(),Pi()); // distribution in range [-pi, pi]
-      return distribution(generator);
-    }, {} )
-    .Define("particles", [](RVec<float> &_px, RVec<float> &_py, RVec<float> &_pz, RVec<float> &_en, float _psi){
-      RVec<fourVector> p;
-      int Np = _px.size();
+    .Define("particles", [](RVec<double> &px, RVec<double> &py, RVec<double> &pz, RVec<double> &e){
+      vector<fourVector> pv;
+      int Np = px.size();
       for (int i=0; i<Np; i++){
-        auto px_0 = _px.at(i);
-        auto py_0 = _py.at(i);
-        auto pt = sqrt(px_0*px_0+py_0*py_0);
-        auto pz = _pz.at(i);
-        auto en = _en.at(i);
-        auto phi = atan2(py_0, px_0);
-        phi += _psi;
-        auto px_1 = pt*cos(phi);
-        auto py_1 = pt*sin(phi);
-        p.push_back( {px_1, py_1, pz, en} );
+        pv.push_back( {px.at(i), py.at(i), pz.at(i), e.at(i)} );
       }
-      return p;
-    }, {"momx", "momy", "momz", "ene", "psi_rp"})
-    .Define("phi", [](RVec<fourVector> _p){ vector<float> phi; for (auto &p:_p){phi.push_back((float)p.Phi());} return phi; }, {"particles"})
-    .Define("pT", [](RVec<fourVector> _p){ vector<float> pt; for (auto &p:_p){pt.push_back((float)p.Pt());} return pt; }, {"particles"})
-    .Define("y", [Y_BEAM,isCms](RVec<fourVector> _p){
+      return pv;
+    }, {"event.fParticles.fPx", "event.fParticles.fPy", "event.fParticles.fPz", "event.fParticles.fE"})
+    .Define("pdg", [](RVec<int> &_pdg){ vector<int> pdg; for (auto &val:_pdg){ pdg.push_back((int)val); } return pdg; }, {"event.fParticles.fPdg"})
+    .Define("pT", [](RVec<fourVector> &p){ vector<float> pt; for (auto &pi:p){ pt.push_back((float)pi.Pt()); } return pt; }, {"particles"})
+    .Define("y", [Y_BEAM,isCms](RVec<fourVector> &p){
       vector<float> y;
-      for (auto &p:_p){
-        if (isCms) y.push_back((float)p.Rapidity());
-        else y.push_back((float)(p.Rapidity() - Y_BEAM));
+      for (auto &pi:p){
+        if (isCms) y.push_back((float)pi.Rapidity());
+        else y.push_back((float)(pi.Rapidity() - Y_BEAM));
       }
       return y;
     }, {"particles"})
-    ;
-  
+    .Define("phi", [](RVec<fourVector> &p){ vector<float> phi; for (auto &pi:p){ phi.push_back((float)pi.Phi()); } return phi; }, {"particles"})
+  ;
+
   auto correction_task = CorrectionTask( dd, "correction_out.root", "qa.root" );
-  correction_task.SetEventVariables( std::regex("b|psi_rp|cent") );
-  correction_task.SetTrackVariables({
-    std::regex("phi|pT|y|pdg")
-  });
+  correction_task.SetEventVariables(std::regex("b|psi_rp|cent"));
+  correction_task.SetTrackVariables({std::regex("pT|y|phi|pdg")});
 
   correction_task.InitVariables();
   correction_task.AddEventAxis( { "cent", {0., 5., 10., 15., 20., 25., 30., 35., 40., 50., 60., 70., 80.} } );
@@ -102,13 +87,13 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
   correction_task.AddVector(psi_rp);
 
   std::vector<Qn::AxisD> sim_proton_axes{
-          { "y", 15, -1.5, 1.5 },
-          { "pT", 20, 0.0, 2.0 },
+          { "sim_y", 15, -1.5, 1.5 },
+          { "sim_pT", 20, 0.0, 2.0 },
   };
 
   std::vector<Qn::AxisD> sim_pion_axes{
-          { "y", 15, -1.5, 1.5 },
-          { "pT", 15, 0.0, 1.5 },
+          { "sim_y", 15, -1.5, 1.5 },
+          { "sim_pT", 15, 0.0, 1.5 },
   };
 
   VectorConfig tru_proton( "tru_proton", "phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
@@ -119,6 +104,7 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
     auto pdg_code = std::round(pid);
     return pdg_code == 2212;
   }, "tru_proton cut" );
+  tru_proton.AddHisto2D({{"y", 300, -1.5, 1.5}, {"pT", 100, 0.0, 2.0}}, "is_proton");
   correction_task.AddVector(tru_proton);
 
   VectorConfig tru_pionP( "tru_pionP", "phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
@@ -129,6 +115,7 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
     auto pdg_code = std::round(pid);
     return pdg_code == 211;
   }, "tru_pionP cut" );
+  tru_pionP.AddHisto2D({{"y", 300, -1.5, 1.5}, {"pT", 100, 0.0, 2.0}}, "is_pionP");
   correction_task.AddVector(tru_pionP);
 
   VectorConfig tru_pionM( "tru_pionM", "phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
@@ -139,6 +126,7 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
     auto pdg_code = std::round(pid);
     return pdg_code == -211;
   }, "tru_pionM cut" );
+  tru_pionM.AddHisto2D({{"y", 300, -1.5, 1.5}, {"pT", 100, 0.0, 2.0}}, "is_pionM");
   correction_task.AddVector(tru_pionM);
 
   correction_task.Run();
