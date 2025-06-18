@@ -171,6 +171,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
     .Define( "sim_is_kaonM", "simPdg==-321" )
     .Define( "sim_is_kaons", "abs(simPdg)==321" )
     .Define( "sim_mother_id", "std::vector<int> vec_mother_id; for( auto id : simMotherId ){ vec_mother_id.push_back( id ); } return vec_mother_id;" )
+    .Define( "sim_dca", "vector <float> vec_dca; for ( auto dca : simPosStart ){ vec_dca.push_back( sqrt( pow(dca.X()-mcVtxX, 2)+pow(dca.Y()-mcVtxY, 2)+pow(dca.Z()-mcVtxZ, 2) ) ); } return vec_dca;" )
     .Define( "tr_pT", "std::vector<float> vec_pT; for( auto mom : recoGlobalMom ){ vec_pT.push_back( mom.Pt() ) ;} return vec_pT;" )
     .Define( "tr_phi", "std::vector<float> vec_phi; for( auto mom : recoGlobalMom ){ vec_phi.push_back( mom.Phi() ); } return vec_phi;" )
     .Define( "tr_eta", "std::vector<float> vec_eta; for( auto mom : recoGlobalMom ){ vec_eta.push_back( mom.Eta() ); } return vec_eta;" )
@@ -224,6 +225,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
     .Define( "tr_nhits", "std::vector<int> vec_nhits; for( auto n : recoGlobalNhits ){ vec_nhits.push_back( n ); } return vec_nhits;" )
     .Define( "tr_dca", "vector <float> vec_dca; for ( auto dca : recoGlobalDca ){ vec_dca.push_back( sqrt( dca.Mag2() ) ); } return vec_dca;" )
     .Define( "tr_primary", "RVec <int> vec_prim; for ( auto dca : tr_dca ){ int prim = ( dca < 1. ) ? 1 : 0; vec_prim.push_back( prim ); } return vec_prim;")
+    .Define( "tr_prim_pi", "RVec <int> vec_prim; for ( auto dca : tr_dca ){ int prim = ( dca < 0.2) ? 1 : 0; vec_prim.push_back( prim ); } return vec_prim;")
     .Define("isTOF", "recoGlobalTofFlag")
     .Define("tr_nsigDedxProton", [f1_dedx_p, f1_dedx_sigm_p]( RVec<float> vec_Pq, RVec<float> vec_dedx ){
       RVec<float> vec_nsig;
@@ -516,8 +518,8 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   correction_task.SetEventVariables(std::regex("b_norm|psi_rp|cent"));
   correction_task.SetChannelVariables({std::regex("fhcal_module_(id|phi|energy|x|y|z)")});
   correction_task.SetTrackVariables({
-      std::regex("tr_(pT|pq|y|eta|phi|charge|pdg|primary|TpcDedx|TofMass2|is_proton|is_pionP|is_pionM|is_pions|nhits|dca|WeightProton|WeightPionP|WeightPionM|WeightPions|WeightKaonP|WeightKaonM|WeightKaons)"),
-      std::regex("sim_(pT|y|phi|pdg|is_proton|is_pionP|is_pionM|is_pions|mother_id)")
+      std::regex("tr_(pT|pq|y|eta|phi|charge|pdg|primary|prim_pi|TpcDedx|TofMass2|is_proton|is_pionP|is_pionM|is_pions|nhits|dca|WeightProton|WeightPionP|WeightPionM|WeightPions|WeightKaonP|WeightKaonM|WeightKaons)"),
+      std::regex("sim_(pT|y|phi|pdg|dca|is_proton|is_pionP|is_pionM|is_pions|mother_id)")
     });
 
   correction_task.InitVariables();
@@ -564,7 +566,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   };
 
   VectorConfig proton( "proton", "tr_phi", "tr_WeightProton", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  proton.SetHarmonicArray( {1, 2} );
+  proton.SetHarmonicArray( {1, 2, 3, 4} );
   proton.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   proton.SetCorrectionAxes( proton_axes );
   // proton.AddCut( "tr_pdg", [](double pid){
@@ -586,7 +588,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   correction_task.AddVector(proton);
   
   VectorConfig pi_pos( "pi_pos", "tr_phi", "tr_WeightPionP", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  pi_pos.SetHarmonicArray( {1, 2} );
+  pi_pos.SetHarmonicArray( {1, 2, 3, 4} );
   pi_pos.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   pi_pos.SetCorrectionAxes( pion_axes );
   // pi_pos.AddCut( "tr_pdg", [](double pid){
@@ -597,17 +599,17 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
     auto pid = std::round(_pid);
     return pid == 1;
   }, "pi_pos cut" );
-  pi_pos.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
+  pi_pos.AddCut( "tr_prim_pi", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   pi_pos.AddCut( "tr_charge", [](double charge){ return charge > 0; }, "q > 0" );
   pi_pos.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
-  pi_pos.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
+  pi_pos.AddCut( "tr_dca", [](double dca){ return dca < 0.2; }, "dca < 0.2 cm" );
   pi_pos.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionP");
   pi_pos.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TofMass2", 220, -0.2, 2.0}}, "tr_is_pionP");
   pi_pos.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TpcDedx", 500, 0., 5.e3}}, "tr_is_pionP");
   correction_task.AddVector(pi_pos);
   
   VectorConfig pi_neg( "pi_neg", "tr_phi", "tr_WeightPionM", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  pi_neg.SetHarmonicArray( {1, 2} );
+  pi_neg.SetHarmonicArray( {1, 2, 3, 4} );
   pi_neg.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   pi_neg.SetCorrectionAxes( pion_axes );
   // pi_neg.AddCut( "tr_pdg", [](double pid){
@@ -622,17 +624,17 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
       auto charge = std::round(_charge);
       return charge < 0;
     }, "pi_neg cut");
-  pi_neg.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
+  pi_neg.AddCut( "tr_prim_pi", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   pi_neg.AddCut( "tr_charge", [](double charge){ return charge < 0; }, "q < 0" );
   pi_neg.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
-  pi_neg.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
+  pi_neg.AddCut( "tr_dca", [](double dca){ return dca < 0.2; }, "dca < 0.2 cm" );
   pi_neg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionM");
   pi_neg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TofMass2", 220, -0.2, 2.0}}, "tr_is_pionM");
   pi_neg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TpcDedx", 500, 0., 5.e3}}, "tr_is_pionM");
   correction_task.AddVector(pi_neg);
   
   VectorConfig Tp( "Tp", "tr_phi", "tr_WeightProton", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  Tp.SetHarmonicArray( {1, 2} );
+  Tp.SetHarmonicArray( {1, 2, 3, 4} );
   Tp.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   // Tp.AddCut( "tr_pdg", [](double pid){
   //   auto pdg_code = std::round(pid);
@@ -656,7 +658,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   correction_task.AddVector(Tp);
   
   VectorConfig Tneg( "Tneg", "tr_phi", "tr_WeightPions", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  Tneg.SetHarmonicArray( {1, 2} );
+  Tneg.SetHarmonicArray( {1, 2, 3, 4} );
   Tneg.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   // Tneg.AddCut( "tr_pdg", [](double pid){
   //   auto pdg_code = std::round(pid);
@@ -670,12 +672,12 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
       auto charge = std::round(_charge);
       return charge < 0;
   }, "pi_neg cut");
-  Tneg.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
+  Tneg.AddCut( "tr_prim_pi", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
   Tneg.AddCut( "tr_y", [](double eta){
     return -1.3 < eta && eta < -0.2;
   }, "Tneg y cut" );
   Tneg.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
-  Tneg.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
+  Tneg.AddCut( "tr_dca", [](double dca){ return dca < 0.2; }, "dca < 0.2 cm" );
   Tneg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPions");
   Tneg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TofMass2", 220, -0.2, 2.0}}, "tr_is_pionM");
   Tneg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TpcDedx", 500, 0., 5.e3}}, "tr_is_pionM");
@@ -692,7 +694,7 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   };
 
   VectorConfig tru_proton( "tru_proton", "sim_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  tru_proton.SetHarmonicArray( {1, 2} );
+  tru_proton.SetHarmonicArray( {1, 2, 3, 4} );
   tru_proton.SetCorrections( {CORRECTION::PLAIN } );
   tru_proton.SetCorrectionAxes( sim_proton_axes );
   tru_proton.AddCut( "sim_pdg", [](double pid){
@@ -707,37 +709,45 @@ void mpd_fixed_target_correct_w_eff(std::string list, std::string cm_energy="2.5
   correction_task.AddVector(tru_proton);
 
   VectorConfig tru_pi_pos( "tru_pi_pos", "sim_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  tru_pi_pos.SetHarmonicArray( {1, 2} );
+  tru_pi_pos.SetHarmonicArray( {1, 2, 3, 4} );
   tru_pi_pos.SetCorrections( {CORRECTION::PLAIN } );
   tru_pi_pos.SetCorrectionAxes( sim_pion_axes );
   tru_pi_pos.AddCut( "sim_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == 211;
   }, "tru_pi_pos cut" );
-  tru_pi_pos.AddCut( "sim_mother_id", [](double pid){
-    auto pdg_code = std::round(pid);
-    return pdg_code == -1;
-  }, "cut on primary" );
+  // tru_pi_pos.AddCut( "sim_mother_id", [](double pid){
+  //   auto pdg_code = std::round(pid);
+  //   return pdg_code == -1;
+  // }, "cut on primary" );
+  tru_pi_pos.AddCut( "sim_dca", [](double dca){
+    auto dca_val = std::round(dca);
+    return dca_val < 0.2;
+  }, "cut on primary");
   tru_pi_pos.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "sim_is_pionP");
   correction_task.AddVector(tru_pi_pos);
 
   VectorConfig tru_pi_neg( "tru_pi_neg", "sim_phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  tru_pi_neg.SetHarmonicArray( {1, 2} );
+  tru_pi_neg.SetHarmonicArray( {1, 2, 3, 4} );
   tru_pi_neg.SetCorrections( {CORRECTION::PLAIN } );
   tru_pi_neg.SetCorrectionAxes( sim_pion_axes );
   tru_pi_neg.AddCut( "sim_pdg", [](double pid){
     auto pdg_code = std::round(pid);
     return pdg_code == -211;
   }, "tru_pi_neg cut" );
-  tru_pi_neg.AddCut( "sim_mother_id", [](double pid){
-    auto pdg_code = std::round(pid);
-    return pdg_code == -1;
-  }, "cut on primary" );
+  // tru_pi_neg.AddCut( "sim_mother_id", [](double pid){
+  //   auto pdg_code = std::round(pid);
+  //   return pdg_code == -1;
+  // }, "cut on primary" );
+  tru_pi_neg.AddCut( "sim_dca", [](double dca){
+    auto dca_val = std::round(dca);
+    return dca_val < 0.2;
+  }, "cut on primary");
   tru_pi_neg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "sim_is_pionM");
   correction_task.AddVector(tru_pi_neg);
 
   VectorConfig psi_rp( "psi_rp", "psi_rp", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  psi_rp.SetHarmonicArray( {1, 2} );
+  psi_rp.SetHarmonicArray( {1, 2, 3, 4} );
   psi_rp.SetCorrections( {CORRECTION::PLAIN } );
   correction_task.AddVector(psi_rp);
 

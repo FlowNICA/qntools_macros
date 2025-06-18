@@ -93,13 +93,13 @@ void mpd_fixed_target_correct_prod36(std::string list, std::string cm_energy="2.
   //   cent_b = {2.84,4.04,4.99,5.79,6.47,7.08,7.65,8.19,9.17,10.03,10.82,11.69,15.76};
   // }
   // Xe+W - prod 35
-  // cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
-  // cent_mult = {202, 132, 112, 95, 81, 68, 57, 47, 39, 32, 26, 21, 16, 12, 9, 6, 4, 2, 1};
-  // cent_b = { 1.43172, 2.87406, 4.05374, 5.0333, 5.86304, 6.58249, 7.22197, 7.80409, 8.34523, 8.8571, 9.34824, 9.8255, 10.2956, 10.7666, 11.2494, 11.7595, 12.3179, 12.9533, 13.7034};
-  // Xe+Xe - prod 36
   cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
-  cent_mult = {162, 103, 87, 74, 63, 53, 44, 36, 30, 24, 19, 15, 12, 9, 7, 5, 3, 2, 1};
-  cent_b = { 1.39543, 2.70341, 3.76519, 4.64771, 5.40276, 6.06901, 6.67396, 7.23605, 7.76659, 8.27183, 8.75493, 9.21803, 9.66421, 10.0995, 10.5351, 10.9889, 11.488, 12.0706, 12.7879};
+  cent_mult = {202, 132, 112, 95, 81, 68, 57, 47, 39, 32, 26, 21, 16, 12, 9, 6, 4, 2, 1};
+  cent_b = { 1.43172, 2.87406, 4.05374, 5.0333, 5.86304, 6.58249, 7.22197, 7.80409, 8.34523, 8.8571, 9.34824, 9.8255, 10.2956, 10.7666, 11.2494, 11.7595, 12.3179, 12.9533, 13.7034};
+  // Xe+Xe - prod 36
+  // cent_bins = {2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 95.};
+  // cent_mult = {162, 103, 87, 74, 63, 53, 44, 36, 30, 24, 19, 15, 12, 9, 7, 5, 3, 2, 1};
+  // cent_b = { 1.39543, 2.70341, 3.76519, 4.64771, 5.40276, 6.06901, 6.67396, 7.23605, 7.76659, 8.27183, 8.75493, 9.21803, 9.66421, 10.0995, 10.5351, 10.9889, 11.488, 12.0706, 12.7879};
   
   TStopwatch timer;
   timer.Start();
@@ -224,6 +224,7 @@ void mpd_fixed_target_correct_prod36(std::string list, std::string cm_energy="2.
     .Define( "tr_nhits", "std::vector<int> vec_nhits; for( auto n : recoGlobalNhits ){ vec_nhits.push_back( n ); } return vec_nhits;" )
     .Define( "tr_dca", "vector <float> vec_dca; for ( auto dca : recoGlobalDca ){ vec_dca.push_back( sqrt( dca.Mag2() ) ); } return vec_dca;" )
     .Define( "tr_primary", "RVec <int> vec_prim; for ( auto dca : tr_dca ){ int prim = ( dca < 1. ) ? 1 : 0; vec_prim.push_back( prim ); } return vec_prim;")
+    .Define( "tr_primaryMc", "RVec <int> vec_prim; for ( auto mId : recoGlobalSimMotherId ){ int prim = ( mId == -1. ) ? 1 : 0; vec_prim.push_back( prim ); } return vec_prim;")
     .Define("isTOF", "recoGlobalTofFlag")
     .Define("tr_nsigDedxProton", [f1_dedx_p, f1_dedx_sigm_p]( RVec<float> vec_Pq, RVec<float> vec_dedx ){
       RVec<float> vec_nsig;
@@ -516,7 +517,7 @@ void mpd_fixed_target_correct_prod36(std::string list, std::string cm_energy="2.
   correction_task.SetEventVariables(std::regex("b_norm|psi_rp|cent"));
   correction_task.SetChannelVariables({std::regex("fhcal_module_(id|phi|energy|x|y|z)")});
   correction_task.SetTrackVariables({
-      std::regex("tr_(pT|pq|y|eta|phi|charge|pdg|primary|TpcDedx|TofMass2|is_proton|is_pionP|is_pionM|is_pions|nhits|dca|WeightProton|WeightPionP|WeightPionM|WeightPions|WeightKaonP|WeightKaonM|WeightKaons)"),
+      std::regex("tr_(pT|pq|y|eta|phi|charge|pdg|primary|primaryMc|TpcDedx|TofMass2|is_proton|is_pionP|is_pionM|is_pions|nhits|dca|WeightProton|WeightPionP|WeightPionM|WeightPions|WeightKaonP|WeightKaonM|WeightKaons)"),
       std::regex("sim_(pT|y|phi|pdg|is_proton|is_pionP|is_pionM|is_pions|mother_id)")
     });
 
@@ -598,9 +599,10 @@ void mpd_fixed_target_correct_prod36(std::string list, std::string cm_energy="2.
     return pid == 1;
   }, "pi_pos cut" );
   pi_pos.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
+  //pi_pos.AddCut( "tr_primaryMc", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary Mc tracks");
   pi_pos.AddCut( "tr_charge", [](double charge){ return charge > 0; }, "q > 0" );
-  pi_pos.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
-  pi_pos.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
+  pi_pos.AddCut( "tr_nhits", [](double nhits){ return nhits > 27; }, "Nhits > 22" );
+  pi_pos.AddCut( "tr_dca", [](double dca){ return dca < 1.; }, "dca < 3.5 cm" );
   pi_pos.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionP");
   pi_pos.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TofMass2", 220, -0.2, 2.0}}, "tr_is_pionP");
   pi_pos.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TpcDedx", 500, 0., 5.e3}}, "tr_is_pionP");
@@ -623,9 +625,10 @@ void mpd_fixed_target_correct_prod36(std::string list, std::string cm_energy="2.
       return charge < 0;
     }, "pi_neg cut");
   pi_neg.AddCut( "tr_primary", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary tracks");
+  //pi_neg.AddCut( "tr_primaryMc", [](double primary) { auto prim = std::round(primary); return prim == 1; }, "primary Mc tracks");
   pi_neg.AddCut( "tr_charge", [](double charge){ return charge < 0; }, "q < 0" );
-  pi_neg.AddCut( "tr_nhits", [](double nhits){ return nhits > 22; }, "Nhits > 22" );
-  pi_neg.AddCut( "tr_dca", [](double dca){ return dca < 3.5; }, "dca < 3.5 cm" );
+  pi_neg.AddCut( "tr_nhits", [](double nhits){ return nhits > 27; }, "Nhits > 22" );
+  pi_neg.AddCut( "tr_dca", [](double dca){ return dca < 1.; }, "dca < 3.5 cm" );
   pi_neg.AddHisto2D({{"tr_y", 300, -1.5, 1.5}, {"tr_pT", 100, 0.0, 2.0}}, "tr_WeightPionM");
   pi_neg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TofMass2", 220, -0.2, 2.0}}, "tr_is_pionM");
   pi_neg.AddHisto2D({{"tr_pq", 1000, -5., 5.}, {"tr_TpcDedx", 500, 0., 5.e3}}, "tr_is_pionM");

@@ -7,7 +7,7 @@ using namespace ROOT::Math;
 using namespace ROOT::RDF;
 using fourVector=LorentzVector<PxPyPzE4D<double>>;
 
-void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string Cms="true")
+void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string Cms="1")
 {
   const bool isCms = (bool)std::stoi(Cms);
   const double sNN = std::stod( cm_energy ); // in GeV
@@ -140,6 +140,16 @@ void mcpico_correct(std::string list, std::string cm_energy="2.4", std::string C
     return pdg_code == -211;
   }, "tru_pionM cut" );
   correction_task.AddVector(tru_pionM);
+
+  VectorConfig tru_deuteron( "tru_deuteron", "phi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  tru_deuteron.SetHarmonicArray( {1, 2} );
+  tru_deuteron.SetCorrections( {CORRECTION::PLAIN } );
+  tru_deuteron.SetCorrectionAxes( sim_proton_axes );
+  tru_deuteron.AddCut( "pdg", [](double pid){
+    auto pdg_code = std::round(pid);
+    return pdg_code == 1000010020;
+  }, "tru_deuteron cut" );
+  correction_task.AddVector(tru_deuteron);
 
   correction_task.Run();
 }

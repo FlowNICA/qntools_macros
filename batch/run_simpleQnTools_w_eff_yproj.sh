@@ -13,6 +13,8 @@ ecm=${3}
 #nucl_mass=${4}
 efficiency_file=${4}
 pid_file=${5}
+a_targ=${6}
+a_proj=${7}
 
 id=$SLURM_ARRAY_TASK_ID
 
@@ -34,17 +36,17 @@ export ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:/lustre/home/user/p/parfenov/Soft/Qn
 export exe_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correct
 export exe_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correlate
 
-export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correct_w_eff.cc
+export macro_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correct_w_eff_yproj.cc
 export macro_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/macro/mpd_fixed_target_correlate.cc
 
 echo "${exe_correct} ${macro_correct} $list_dir/$file_list $ecm $nucl_mass $efficiency_file $pid_file"
 
 # PLAIN
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
+time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file $a_targ $a_proj
 # RECENTERING
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
+time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file $a_targ $a_proj
 # TWIST AND RESCALING
-time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file
+time $exe_correct $macro_correct $list_dir/$file_list $ecm $efficiency_file $pid_file $a_targ $a_proj
 
 echo "${exe_correlate} ${macro_correlate} correction_out.root"
 time ${exe_correlate} ${macro_correlate} correction_out.root

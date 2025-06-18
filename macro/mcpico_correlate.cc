@@ -3,12 +3,14 @@
 vector <vector<string>> u1Q1=
 {
   {"tru_proton_PLAIN", "psi_rp_PLAIN"},
+  {"tru_deuteron_PLAIN", "psi_rp_PLAIN"},
   {"tru_pionP_PLAIN", "psi_rp_PLAIN"},
   {"tru_pionM_PLAIN", "psi_rp_PLAIN"},
 };
 
 vector <vector<string>> u2Q2{
   {"tru_proton_PLAIN", "psi_rp_PLAIN"},
+  {"tru_deuteron_PLAIN", "psi_rp_PLAIN"},
   {"tru_pionP_PLAIN", "psi_rp_PLAIN"},
   {"tru_pionM_PLAIN", "psi_rp_PLAIN"},
 };

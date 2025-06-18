@@ -24,12 +24,12 @@ mkdir $id
 cd $id
 
 source /cvmfs/nica.jinr.ru/sw/os/login.sh latest
-module add mpddev/v23.09.23-1
+module add mpddev/v24.12.24-1
 export MPDROOT=/lustre/home/user/p/parfenov/Soft/mpdroot/install
 source /lustre/home/user/p/parfenov/Soft/mpdroot/install/config/env.sh
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lustre/home/user/p/parfenov/Soft/QnTools/install-mpd/lib/:/lustre/home/user/p/parfenov/Soft/qntools_macros/build/
-export ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:/lustre/home/user/p/parfenov/Soft/QnTools/install-mpd/include/QnTools/:/lustre/home/user/p/parfenov/Soft/qntools_macros/src/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lustre/home/user/p/parfenov/Soft/QnTools/install/lib/:/lustre/home/user/p/parfenov/Soft/qntools_macros/build/
+export ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:/lustre/home/user/p/parfenov/Soft/QnTools/install/include/QnTools/:/lustre/home/user/p/parfenov/Soft/qntools_macros/src/
 
 export exe_correct=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correct
 export exe_correlate=/lustre/home/user/p/parfenov/Soft/qntools_macros/build/correlate
