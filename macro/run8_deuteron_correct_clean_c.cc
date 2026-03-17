@@ -2,16 +2,13 @@
 // Created by Misha on 3/7/2023.
 //
 
-#include <cassert>
 #include <cmath>
 #include <vector>
 
-void run8_proton_correct_clean( std::string list, 
+void run8_deuteron_correct_clean_c( std::string list, 
                           std::string str_effieciency_file,
                           std::string centrality_calib_file,
-                          std::string str_pid_tof400_file,
-                          std::string str_pid_tof700_file,
-                          std::string calib_in_file="qa.root" ){
+                          std::string calib_in_file ){
 
   std::cout << "starting execution" << std::endl;
   
@@ -21,44 +18,41 @@ void run8_proton_correct_clean( std::string list,
   const float Y_CM = 1.15141;
   const float FHCAL_Z = 980; // cm
 
-  auto file_pid400 = std::unique_ptr< TFile, std::function< void(TFile*) > >{ TFile::Open( str_pid_tof400_file.c_str(), "READ" ), [](auto f){f->Close(); } };
-  auto file_pid700 = std::unique_ptr< TFile, std::function< void(TFile*) > >{ TFile::Open( str_pid_tof700_file.c_str(), "READ" ), [](auto f){f->Close(); } };
+  auto f1_1000010020_m_400 = new TF1("1000010020_mean_400", "pol1");
+  f1_1000010020_m_400->SetParameter(0, 3.747689);
+  f1_1000010020_m_400->SetParameter(1, -0.06458474);
 
-  assert(file_pid400);
-  assert(file_pid700);
+  auto f1_1000010020_s_400 = new TF1("1000010020_mean_400", "pol2");
+  f1_1000010020_s_400->SetParameter(0, 0.4300834);
+  f1_1000010020_s_400->SetParameter(1, -0.1524903);
+  f1_1000010020_s_400->SetParameter(2, 0.03383528);
 
-  TF1* f1_2212_m_400{nullptr};
-  file_pid400->GetObject( "fit_2212_x0", f1_2212_m_400 );
-  assert(f1_2212_m_400);
+  auto f1_1000010020_m_700 = new TF1("1000010020_mean_700", "pol1");
+  f1_1000010020_m_700->SetParameter(0, 3.715902);
+  f1_1000010020_m_700->SetParameter(1, -0.06247631);
 
-  TF1* f1_2212_m_700{nullptr};
-  file_pid700->GetObject( "fit_2212_x0", f1_2212_m_700 );
-  assert(f1_2212_m_700);
+  auto f1_1000010020_s_700 = new TF1("1000010020_mean_700", "pol2");
+  f1_1000010020_s_700->SetParameter(0, 0.2468444);
+  f1_1000010020_s_700->SetParameter(1, -0.04186103);
+  f1_1000010020_s_700->SetParameter(2, 0.02110062);
+  
+  auto file_fit = TFile::Open(centrality_calib_file.c_str(), "READ");
+  file_fit->cd();
+  auto g1_FitVtxX = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_x");
+  auto g1_FitVtxY = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_y");
+  auto g1_FitVtxZ = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_z");
 
-  TF1* f1_2212_s_400{nullptr};
-  file_pid400->GetObject( "fit_2212_sigma", f1_2212_s_400 );
-  assert(f1_2212_s_400);
-
-  TF1* f1_2212_s_700{nullptr};
-  file_pid700->GetObject( "fit_2212_sigma", f1_2212_s_700 );
-  assert(f1_2212_s_700);
-
-  auto file_fit = TFile::Open( centrality_calib_file.c_str(), "READ" );
-	file_fit->cd();
-	auto g1_FitVtxX = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_x");
-	auto g1_FitVtxY = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_y");
-	auto g1_FitVtxZ = file_fit->Get<TGraphErrors>("grNew_def_h2_RunId_vtx_z");
-
-	auto g1_FitRunIdFactor_1 = file_fit->Get<TGraphErrors>("RunId_corr_factor_h2_RunId_nTracks_8120_8170");
-	auto g1_FitRunIdFactor_2 = file_fit->Get<TGraphErrors>("RunId_corr_factor_h2_RunId_nTracks_7400_7450");
+  auto g1_FitRunIdFactor_1 = file_fit->Get<TGraphErrors>("RunId_corr_factor_h2_RunId_nTracks_8120_8170");
+  auto g1_FitRunIdFactor_2 = file_fit->Get<TGraphErrors>("RunId_corr_factor_h2_RunId_nTracks_7400_7450");
 
   auto vtx_correction_generator = 
-  []( TGraphErrors* g1_calib ){
-    return [g1_calib](double _vtx, UInt_t _runId){return _vtx - g1_calib->Eval( static_cast<double>(_runId) ); };
+  []( TGraphErrors *g1_calib ) { 
+    return [g1_calib](double _vtx, UInt_t _runId) { return _vtx - g1_calib->Eval(static_cast<double>(_runId)); }; 
   };
-  auto ref_mult_generator =
-  []( TGraphErrors* g1_calib ){
-    return [g1_calib](unsigned long _mult, UInt_t _runId){ return (_mult * g1_calib->Eval( static_cast<double>(_runId) )); };
+
+  auto ref_mult_generaton = 
+  []( TGraphErrors *g1_calib ){
+    return [g1_calib]( unsigned long _mult, UInt_t _runId ) { return _mult * g1_calib->Eval(static_cast<double>(_runId)); };
   };
   auto m2_function = 
   []
@@ -94,6 +88,41 @@ void run8_proton_correct_clean( std::string list,
       return vec_n_sigma;
     };
   };
+
+  const auto is_particle_tof_generator = []( const double lo, const double hi ){
+		return [lo, hi]( std::vector<float> vec_tof ){
+		    	auto vec_is = std::vector<int>{};
+		    	vec_is.reserve( vec_tof.size() );
+		    	std::for_each( vec_tof.begin(), vec_tof.end(), [&vec_is, lo, hi](const auto nsigma) mutable { vec_is.push_back( lo < nsigma && nsigma < hi ? 1 : 0 ); } );
+		    	return vec_is;
+		    };
+	};
+
+	const auto isDeuteronTof700 = []( std::vector<float> vec_tof_Nsigma, std::vector<float> vec_pq ) {
+		const double hi = 3;
+		auto ind = 0;
+		auto vec_isDe = std::vector<int>{};
+		vec_isDe.reserve( vec_tof_Nsigma.size() );
+		std::for_each(vec_tof_Nsigma.begin(), vec_tof_Nsigma.end(), [&vec_isDe, &vec_pq, &ind, hi](const auto nsigma) mutable { 
+			double lo = -2.;
+			if ( 3. <= vec_pq.at(ind) ) 
+        lo = -1;
+			vec_isDe.push_back( lo < nsigma && nsigma < hi ? 1 : 0 ); 
+			ind++;
+			} );
+		return vec_isDe;
+	};
+
+  const auto IsParticle = []( std::vector<int> vec_400, std::vector<int> vec_700 ){
+	    	auto vec_is = std::vector<int>( vec_400.size(), 0 );
+	    	for( size_t i=0; i<vec_400.size(); ++i ){
+	    		if( vec_400.at(i) == 1 )
+	    			vec_is.at(i) = 1;
+	    		if( vec_700.at(i) == 1 )
+	    			vec_is.at(i) = 1;
+	    	}
+	    	return vec_is;
+	    };
    
 	const auto n_sigma_particle_function = 
   []
@@ -153,13 +182,10 @@ void run8_proton_correct_clean( std::string list,
     };
 
   const auto centrality_function = 
-  []
-  (double multiplicity){
+  [](double multiplicity){
       float centrality;
-      // std::vector<float> centrality_percentage{ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 30, 40, 50, 60, 70, 100 };
-      std::vector<float> centrality_percentage{ 0, 10, 20, 30, 40, 50, 60, 70, 100 };
-      // std::vector<int> multiplicity_edges{ 236, 183, 167, 155, 145, 136, 127, 119, 111, 104, 97, 71, 49, 33, 22, 12, 0  };
-      std::vector<int> multiplicity_edges{ 206, 98, 70, 49, 34, 22, 14, 8, 0  };
+      std::vector<float> centrality_percentage{ 0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 100 };
+      std::vector<int> multiplicity_edges{ 236, 161, 137, 116, 99, 84, 71, 59, 49, 33, 22, 12, 0 };
       if( multiplicity > multiplicity_edges[0] )
         return -1.0f;
       int idx = 0;
@@ -171,7 +197,7 @@ void run8_proton_correct_clean( std::string list,
       }
       centrality = (centrality_percentage[idx-1] + centrality_percentage[idx])/2.0f;
       return centrality;
-  };
+    };
   
   const auto dca_function = [](std::vector<float> vec_x, std::vector<float> vec_y){
     std::vector<float> vec_r{};
@@ -198,47 +224,11 @@ void run8_proton_correct_clean( std::string list,
         auto y_bin = efficiency_map->GetXaxis()->FindBin( y );
         auto pT_bin = efficiency_map->GetYaxis()->FindBin( pT );
         auto efficiency = efficiency_map->GetBinContent( y_bin, pT_bin );
-        auto weight = 5e-2 < efficiency && efficiency < 1 ? 1.0 / efficiency : 0.0;
+        auto weight = efficiency > 1e-2 ? 1.0 / efficiency : 0.0;
         vec_weight.push_back( weight );
       }
       return vec_weight;
     };
-  };
-
-  auto charge_function = []( std::vector<float> vec_pq, ROOT::VecOps::RVec<float> vec_dedx ){
-    auto bb_body = [](Double_t *x, Double_t *par) {
-    // x[0] = p/q (momentum over charge) in GeV/c
-      Double_t p = x[0];
-      Double_t m = par[0];
-      Double_t A = par[1];
-      Double_t delta = par[2];
-      Double_t norm = par[3];
-      Double_t me = 0.000511;
-
-      Double_t bg = p / m;
-      Double_t beta = bg / sqrt(1. + bg * bg);
-      Double_t gamma_fac = sqrt(1. + bg * bg);
-      Double_t ekin_max = 2*pow(m * gamma_fac + me, 2) * me / (m * m);
-      Double_t dEdx = A * (1. / (beta * beta)) * (-5.296 + log(bg) + log(ekin_max) - 2 * beta * beta - delta);
-
-      return norm * dEdx;
-    };
-    auto f1_bethebloch_d = new TF1("fBetheBloch_d", bb_body, 0.1, 10, 4);
-    f1_bethebloch_d->SetParameter(0, 2.26);
-    f1_bethebloch_d->SetParameter(1, -1.64);
-    f1_bethebloch_d->SetParameter(2, 35.73);
-    f1_bethebloch_d->SetParameter(3, 2.02);
-
-    auto vec_q = std::vector<float>( vec_pq.size(), -1.f );
-    for( auto i = size_t{0}; i<vec_pq.size(); ++i ){
-      auto pq = vec_pq.at(i);
-      auto dedx = vec_dedx.at(i);
-      if( pq < 0 ) 
-        continue; 
-      auto cut = f1_bethebloch_d->Eval( pq );
-      vec_q.at(i) =  dedx < cut ? 1.f : 2.f;
-    }
-    return vec_q;
   };
 
   std::unique_ptr<TFile> effieciency_file{TFile::Open( str_effieciency_file.c_str(), "READ" )};
@@ -246,13 +236,13 @@ void run8_proton_correct_clean( std::string list,
   TH2D* efficiency_tof400{nullptr};
   TH2D* efficiency_tof700{nullptr};
 
-  effieciency_file->GetObject("efficiency_2212_tof", efficiency_histo);
+  effieciency_file->GetObject("efficiency_1000010020_tof", efficiency_histo);
   if( !efficiency_histo )
     std::cerr << "Warning: No efficiency for both tof was found in file " << str_effieciency_file << "\n";
-  effieciency_file->GetObject("efficiency_2212_tof400", efficiency_tof400);
+  effieciency_file->GetObject("efficiency_1000010020_tof400", efficiency_tof400);
   if( !efficiency_tof400 )
     std::cerr << "Warning: No efficiency for tof-400 was found in file " << str_effieciency_file << "\n";
-  effieciency_file->GetObject("efficiency_2212_tof700", efficiency_tof700);
+  effieciency_file->GetObject("efficiency_1000010020_tof700", efficiency_tof700);
   if( !efficiency_tof700 )
     std::cerr << "Warning: No efficiency for tof-700 was found in file " << str_effieciency_file << "\n";
   
@@ -260,35 +250,27 @@ void run8_proton_correct_clean( std::string list,
   std::vector<int> bad_runs{7313, 7415, 7417, 7435, 7469, 7517, 7519, 7520, 7537, 7575, 7604, 7630, 7657, 7659, 7679, 7681, 7705, 7735, 7843, 7847, 7848, 7850, 7851, 7852, 7853, 7855, 7856, 7857, 7858, 7859, 7865, 7868, 7907, 7931, 7932, 7933, 7935, 7937, 7938, 7939, 7954, 7955, 8031, 8032, 8033, 8115, 8121, 8167, 8201, 8204, 8205, 8208, 8209, 8210, 8211, 8212, 8213, 8215, 8247, 8265, 8266, 8267, 8281, 8289};
 
   std::vector<int> f1_modules = {
-    6,  7,  8,
-    11, 12, 13,
-    16,     17,
-    20, 21, 22, 
-    25, 26, 27
+    34, 35, 
+    36, 37, 
+    38, 39, 
+    40, 41, 
+    42, 43, 
   };
   std::vector<int> f2_modules = {
-    0,  1,  2,  3,  4,
-    5,              9,
-    10,             14,
-    15,             18,
-    19,             23,
-    24,             28,
+     0,  1,  2,  3,  4,
+     5,  6,  7,  8,  9,
+    10, 11, 12, 13, 14,
+    15, 16,     17, 18, 
+    19, 20, 21, 22, 23,
+    24, 25, 26, 27, 28,
     29, 30, 31, 32, 33,
   };
   std::vector<int> f3_modules = {
-    35,                 44,
-    37,                 46, 
-    39,                 48, 
-    41,                 50,
-    43,                 52
-  };
-
-  std::vector<int> f4_modules = {
-    34,                     45,
-    36,                     47, 
-    38,                     49, 
-    40,                     51,
-    42,                     53
+    44, 45,
+    46, 47,
+    48, 49,
+    50, 51, 
+    52, 53,
   };
 
   TStopwatch timer;
@@ -300,20 +282,20 @@ void run8_proton_correct_clean( std::string list,
   ROOT::RDataFrame d( *chain );
   std::cout << "Preparing the RDF" << std::endl;
   auto dd=d
-          .Define( "vtxXcorr", vtx_correction_generator(g1_FitVtxX), {"vtxX","runId"})
-          .Define( "vtxYcorr", vtx_correction_generator(g1_FitVtxY), {"vtxY","runId"})
-          .Define( "vtxZcorr", vtx_correction_generator(g1_FitVtxY), {"vtxZ","runId"})
-          .Define( "vtxRcorr", "return sqrt(vtxXcorr*vtxXcorr + vtxYcorr*vtxYcorr);" )
+          .Define( "vtxXcorr", vtx_correction_generator(g1_FitVtxX), {"vtxX", "runId"} )
+          .Define( "vtxYcorr", vtx_correction_generator(g1_FitVtxY), {"vtxY", "runId"} )
+          .Define( "vtxZcorr", vtx_correction_generator(g1_FitVtxZ), {"vtxZ", "runId"} )
+          .Define( "vtxRcorr", "return sqrt(vtxXcorr*vtxXcorr + vtxYcorr*vtxYcorr);")
           .Define("track_multiplicity", "return trMom.size();")
-          .Define( "ref_multiplicity", ref_mult_generator( g1_FitRunIdFactor_2 ), {"track_multiplicity","runId"} )
-          .Define("stsNdigits","return stsDigits.size()" )
+          .Define("ref_multiplicity", ref_mult_generaton(g1_FitRunIdFactor_1), {"track_multiplicity", "runId"} )
+          .Define( "stsNdigits","return stsDigits.size()" )
           .Define("centrality", centrality_function, {"ref_multiplicity"} )
           .Define("fhcalModPhi","ROOT::VecOps::RVec<float> phi; for(auto& pos:fhcalModPos) phi.push_back(pos.phi()); return phi;")
           .Define("fhcalModX","ROOT::VecOps::RVec<float> x; for(auto& pos:fhcalModPos) x.push_back(pos.x()); return x;")
           .Define("fhcalModY","ROOT::VecOps::RVec<float> y; for(auto& pos:fhcalModPos) y.push_back(pos.y()); return y;")
           .Define("trPt","ROOT::VecOps::RVec<float> pt; for(auto& mom:trMom) pt.push_back(mom.pt()); return pt;")
-          .Define( "trDcaX", " std::vector<float> vec_par; for( auto par : globalTrackParameters ){ vec_par.push_back( par.at(0) - vtxX ); } return vec_par; " )
-		      .Define( "trDcaY", " std::vector<float> vec_par; for( auto par : globalTrackParameters ){ vec_par.push_back( par.at(1) - vtxY ); } return vec_par; " )
+          .Define( "trDcaX", " std::vector<float> vec_par; for( auto par : trParamFirst ){ vec_par.push_back( par.at(0) - vtxXcorr ); } return vec_par; " )
+		      .Define( "trDcaY", " std::vector<float> vec_par; for( auto par : trParamFirst ){ vec_par.push_back( par.at(1) - vtxYcorr ); } return vec_par; " )
           .Define( "trDcaR", dca_function, {"trDcaX", "trDcaY"} )
           .Define( "trFhcalX", function_fhcal_x, {"trParamLast"} )
           .Define( "trFhcalY", function_fhcal_y, {"trParamLast"} )
@@ -322,16 +304,18 @@ void run8_proton_correct_clean( std::string list,
           .Define( "trPy", " std::vector<float> py; for( auto mom : trMom ){ py.push_back( mom.Py() ); } return py; " )
           .Define( "pz", " std::vector<float> pz; for( auto mom : trMom ){ pz.push_back( mom.Pz() ); } return pz; " )
           .Define( "pq", " std::vector<float> pq; for( int i=0; i<trMom.size(); i++ ){ pq.push_back( trMom.at(i).P() / trCharge.at(i) ); } return pq;" )
-          .Define( "trQ", charge_function, {"pq", "trEnergyLoss"} )
-          // .Define( "trM2Tof700", m2_function, { "trMom", "trBetaTof700" } )
-          // .Define( "trM2Tof400", m2_function, { "trMom", "trBetaTof400" } )
-          .Define( "trNsigmaProton400", n_sigma_generator(f1_2212_m_400, f1_2212_s_400), { "pq", "trM2Tof400" } )
-          .Define( "trNsigmaProton700", n_sigma_generator(f1_2212_m_700, f1_2212_s_700), { "pq", "trM2Tof700"  } )
-          .Define( "trNsigmaProton", n_sigma_particle_function, {"trNsigmaProton400", "trNsigmaProton700"} )
-          .Define( "trProtonY", rapidity_generator(PROTON_M, Y_CM), {"pz", "pq"} )
-          .Define( "trWeight", weight_generator(efficiency_histo), {"trProtonY", "trPt"} )
-          .Define( "trWeightTof400", weight_generator(efficiency_tof400), {"trProtonY", "trPt"} )
-          .Define( "trWeightTof700", weight_generator(efficiency_tof700), {"trProtonY", "trPt"} )
+          .Define( "trM2Tof700", m2_function, { "trMom", "trBetaTof700" } )
+          .Define( "trM2Tof400", m2_function, { "trMom", "trBetaTof400" } )
+          .Define( "trNsigmaDeuteron400", n_sigma_generator(f1_1000010020_m_400, f1_1000010020_s_400), { "pq", "trM2Tof400" } )
+          .Define( "trNsigmaDeuteron700", n_sigma_generator(f1_1000010020_m_700, f1_1000010020_s_700), { "pq", "trM2Tof700"  } )
+          .Define( "trNsigmaDeuteron", n_sigma_particle_function, {"trNsigmaDeuteron400", "trNsigmaDeuteron700"} )
+          .Define( "trIsDeuteronTof400", is_particle_tof_generator(-3, 3), {"trNsigmaDeuteron400"} )
+		      .Define( "trIsDeuteronTof700", isDeuteronTof700, {"trNsigmaDeuteron700", "pq"} )
+		      .Define( "trIsDeuteron", IsParticle, {"trIsDeuteronTof400", "trIsDeuteronTof700"} )
+          .Define( "trDeuteronY", rapidity_generator(DEUTERON_M, Y_CM), {"pz", "pq"} )
+          .Define( "trWeight", weight_generator(efficiency_histo), {"trDeuteronY", "trPt"} )
+          .Define( "trWeightTof400", weight_generator(efficiency_tof400), {"trDeuteronY", "trPt"} )
+          .Define( "trWeightTof700", weight_generator(efficiency_tof700), {"trDeuteronY", "trPt"} )
           .Alias("trStsNhits", "stsTrackNhits")
           .Alias("trStsChi2", "stsTrackChi2Ndf")
           .Define("trEta","ROOT::VecOps::RVec<float> eta; for(auto& mom : trMom) eta.push_back(mom.eta()); return eta;")
@@ -345,26 +329,29 @@ void run8_proton_correct_clean( std::string list,
           }, {"runId"} )
           .Filter("runId < 8312")
           .Filter( []( ROOT::VecOps::RVec<unsigned int> map ){ return map[0] & (1<<7); }, {"triggerMapAR"} )
+          .Filter([]( unsigned long sts_digits, unsigned long n_tracks ){ 
+            double sts_min = sts_digits-n_tracks*(4.81632+0.0332792*n_tracks-9.62078e-05*n_tracks*n_tracks);
+            double sts_max = sts_digits-n_tracks*(19.4203-0.0518774*n_tracks+4.56033e-05*n_tracks*n_tracks);
+            return -74.0087 < sts_min && sts_max < 188.248; 
+          }, {"stsNdigits", "track_multiplicity"} )
           .Filter("vtxNtracks > 2")
-          .Filter("fabs(vtxRcorr)<1")
-          .Filter("fabs(vtxZcorr)<0.5")
-          .Filter("noPileup == 1")
+          .Filter("fabs(vtxRcorr)<1.0")
+          .Filter("fabs(vtxZcorr)<0.1")
   ; // at least one filter is mandatory!!!
 
   auto correction_task = CorrectionTask( dd, "correction_out.root", calib_in_file );
-  correction_task.SetEventVariables(std::regex("centrality|runId"));
+  correction_task.SetEventVariables(std::regex("centrality"));
   correction_task.SetChannelVariables({std::regex("fhcalMod(X|Y|Phi|E|Id)")});
   correction_task.SetTrackVariables({
-                                            std::regex("tr(Pt|Px|Py|Eta|Phi|NsigmaProton|NsigmaProton400|NsigmaProton700|Charge|ProtonY|DcaR|Chi2Ndf|Nhits|Weight|WeightTof400|WeightTof700|FhcalX|FhcalY|StsNhits|StsChi2|Q)"),
+                                            std::regex("tr(Pt|Px|Py|Eta|Phi|NsigmaDeuteron|NsigmaDeuteron400|NsigmaDeuteron700|IsDeuteron|Charge|DeuteronY|DcaR|Chi2Ndf|Nhits|Weight|WeightTof400|WeightTof700|FhcalX|FhcalY|StsNhits|StsChi2)"),
                                     });
 
   correction_task.InitVariables();
-  correction_task.AddEventAxis( {"centrality", 6, 0, 60} );
-  correction_task.AddEventAxis( { "runId", 17, 6600, 8300 } );
+  correction_task.AddEventAxis( {"centrality", 8, 0, 40} );
 
   VectorConfig f1( "F1", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
-  f1.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  f1.SetCorrections( {CORRECTION::PLAIN } );
+  f1.SetHarmonicArray( {1, 2} );
+  f1.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   f1.AddCut( "fhcalModId", [&f1_modules](double mod_id){
     auto id = static_cast<int>(mod_id);
     return std::find( f1_modules.begin(), f1_modules.end(), id) != f1_modules.end();
@@ -373,8 +360,8 @@ void run8_proton_correct_clean( std::string list,
   correction_task.AddVector(f1);
 
   VectorConfig f2( "F2", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
-  f2.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  f2.SetCorrections( {CORRECTION::PLAIN } );
+  f2.SetHarmonicArray( {1, 2} );
+  f2.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   f2.AddCut( "fhcalModId", [&f2_modules](double mod_id){
     auto id = static_cast<int>(mod_id);
     return std::find( f2_modules.begin(), f2_modules.end(), id) != f2_modules.end();
@@ -383,8 +370,8 @@ void run8_proton_correct_clean( std::string list,
   correction_task.AddVector(f2);
 
   VectorConfig f3( "F3", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
-  f3.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  f3.SetCorrections( {CORRECTION::PLAIN } );
+  f3.SetHarmonicArray( {1, 2} );
+  f3.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   f3.AddCut( "fhcalModId", [&f3_modules](double mod_id){
     auto id = static_cast<int>(mod_id);
     return std::find( f3_modules.begin(), f3_modules.end(), id) != f3_modules.end();
@@ -392,19 +379,9 @@ void run8_proton_correct_clean( std::string list,
   f3.AddHisto2D({{"fhcalModX", 100, -100, 100}, {"fhcalModY", 100, -100, 100}});
   correction_task.AddVector(f3);
 
-  VectorConfig f4( "F4", "fhcalModPhi", "fhcalModE", VECTOR_TYPE::CHANNEL, NORMALIZATION::M );
-  f4.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  f4.SetCorrections( {CORRECTION::PLAIN } );
-  f4.AddCut( "fhcalModId", [&f4_modules](double mod_id){
-    auto id = static_cast<int>(mod_id);
-    return std::find( f4_modules.begin(), f4_modules.end(), id) != f4_modules.end();
-    }, "F3 Cut" );
-  f4.AddHisto2D({{"fhcalModX", 100, -100, 100}, {"fhcalModY", 100, -100, 100}});
-  correction_task.AddVector(f4);
-
   VectorConfig Tneg( "Tneg", "trPhi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  Tneg.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  Tneg.SetCorrections( {CORRECTION::PLAIN } );
+  Tneg.SetHarmonicArray( {1, 2} );
+  Tneg.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   Tneg.AddCut( "trCharge", [](double charge){
     return charge < 0.0;
     }, "charge" );
@@ -423,8 +400,8 @@ void run8_proton_correct_clean( std::string list,
   correction_task.AddVector(Tneg);
 
   VectorConfig Tpos( "Tpos", "trPhi", "Ones", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  Tpos.SetHarmonicArray( {1, 2, 3, 4, 5, 6 } );
-  Tpos.SetCorrections( {CORRECTION::PLAIN } );
+  Tpos.SetHarmonicArray( {1, 2, 3} );
+  Tpos.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
   Tpos.AddCut( "trCharge", [](double charge){
     return charge >= 0.0;
     }, "charge" );
@@ -442,38 +419,35 @@ void run8_proton_correct_clean( std::string list,
     }, "cut on y-pos in fhcal plane" );
   correction_task.AddVector(Tpos);
 
-  std::vector<Qn::AxisD> proton_axes{
-        { "trProtonY", 6, -0.1, 1.1 },
-        { "trPt", 5, 0.0, 2.0 },
+  std::vector<Qn::AxisD> deuteron_axes{
+        { "trDeuteronY", 16, -0.2, 1.4 },
+        { "trPt", 10, 0.0, 2.0 },
   };
   
-  VectorConfig proton( "proton", "trPhi", "trWeight", VECTOR_TYPE::TRACK, NORMALIZATION::M );
-  proton.SetHarmonicArray( { 1, 2, 3, 4, 5, 6 } );
-  proton.SetCorrections( { CORRECTION::PLAIN } );
-  proton.SetCorrectionAxes( proton_axes );
-  proton.AddCut( "trNsigmaProton", [](double n_sigma){
-    return n_sigma < 3;
-  }, "proton cut" );
-  proton.AddCut( "trFhcalX", [](double pos){
+  VectorConfig deuteron( "deuteron", "trPhi", "trWeight", VECTOR_TYPE::TRACK, NORMALIZATION::M );
+  deuteron.SetHarmonicArray( {1, 2, 3} );
+  deuteron.SetCorrections( {CORRECTION::PLAIN, CORRECTION::RECENTERING, CORRECTION::TWIST_RESCALING } );
+  deuteron.SetCorrectionAxes( deuteron_axes );
+  deuteron.AddCut( "trIsDeuteron", [](int isDe) {
+    return isDe == 1; 
+  }, "isDeuteron step n_sigma cut" );
+  deuteron.AddCut( "trFhcalX", [](double pos){
     return pos < -30.0 || pos > 160;
   }, "cut on x-pos in fhcal plane" );
-  proton.AddCut( "trFhcalY", [](double pos){
+  deuteron.AddCut( "trFhcalY", [](double pos){
     return pos < -60.0 || pos > 60;
   }, "cut on y-pos in fhcal plane" );
-  proton.AddCut( "trStsNhits", [](double nhits){
+  deuteron.AddCut( "trStsNhits", [](double nhits){
     return nhits > 5.5;
   }, "cut on fake tracks" );
-  proton.AddCut( "trDcaR", [](double dca){
+  deuteron.AddCut( "trDcaR", [](double dca){
     return dca < 5.0;
   }, "DCA cut" );
-  proton.AddCut( "trStsChi2", [](double chi2){
+  deuteron.AddCut( "trStsChi2", [](double chi2){
     return chi2 < 5.0;
   }, "cut on chi2 in sts" );
-  proton.AddCut( "trQ", [](double q){
-    return 0.5 < q && q < 1.5;
-  }, "cut on charge == 1" );
-  proton.AddHisto2D({{"trProtonY", 100, -0.5, 1.5}, {"trPt", 100, 0.0, 2.0}});
-  correction_task.AddVector(proton);
+  deuteron.AddHisto2D({{"trDeuteronY", 100, -0.5, 1.5}, {"trPt", 100, 0.0, 2.0}});
+  correction_task.AddVector(deuteron);
 
   std::cout << "Initialized" << std::endl;
 
